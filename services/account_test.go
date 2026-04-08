@@ -50,7 +50,7 @@ func TestCreate(t *testing.T) {
 		Currency:     "GBP",
 	}
 
-	created, err := svc.Create("key-1", account)
+	created, err := svc.Create("key-1", "POST /accounts", account)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestCreate_DuplicateIdempotencyKey(t *testing.T) {
 		Currency:     "GBP",
 	}
 
-	_, err := svc.Create("dup-key", account)
+	_, err := svc.Create("dup-key", "POST /accounts", account)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -101,12 +101,35 @@ func TestCreate_DuplicateIdempotencyKey(t *testing.T) {
 		Currency:     "GBP",
 	}
 
-	_, err = svc.Create("dup-key", account2)
+	_, err = svc.Create("dup-key", "POST /accounts", account2)
 	if err == nil {
 		t.Fatal("expected error for duplicate key, got nil")
 	}
 	if _, ok := err.(*apperrors.DuplicateRequest); !ok {
 		t.Fatalf("expected *apperrors.DuplicateRequest, got %T", err)
+	}
+}
+
+func TestIdempotencyKey_ReusedAcrossEndpoints(t *testing.T) {
+	db := setupTestDB(t)
+	svc := NewAccountService(db, NewIdempotencyService())
+
+	account := &entities.Account{
+		Name: "Test", Surname: "User", Email: "test@example.com",
+		AddressLine1: "1 St", City: "London", Postcode: "E1", Country: "UK",
+		Balance: 1000, Currency: "GBP",
+	}
+	_, err := svc.Create("shared-key", "POST /accounts", account)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = svc.Deposit("shared-key", "POST /accounts/{id}/deposit", account.ID, 500)
+	if err == nil {
+		t.Fatal("expected error when reusing idempotency key across endpoints, got nil")
+	}
+	if _, ok := err.(*apperrors.IdempotencyKeyReused); !ok {
+		t.Fatalf("expected *apperrors.IdempotencyKeyReused, got %T", err)
 	}
 }
 
@@ -125,9 +148,9 @@ func TestDeposit(t *testing.T) {
 		Balance:      1000,
 		Currency:     "GBP",
 	}
-	created, _ := svc.Create("create-key", account)
+	created, _ := svc.Create("create-key", "POST /accounts", account)
 
-	updated, err := svc.Deposit("deposit-key", created.ID, 500)
+	updated, err := svc.Deposit("deposit-key", "POST /accounts/1/deposit", created.ID, 500)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -140,7 +163,7 @@ func TestDeposit_NotFound(t *testing.T) {
 	db := setupTestDB(t)
 	svc := NewAccountService(db, NewIdempotencyService())
 
-	_, err := svc.Deposit("dep-key", 999, 100)
+	_, err := svc.Deposit("dep-key", "POST /accounts/999/deposit", 999, 100)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -164,10 +187,10 @@ func TestTransfer(t *testing.T) {
 		Balance: 500, Currency: "GBP",
 	}
 
-	from, _ = svc.Create("key-from", from)
-	to, _ = svc.Create("key-to", to)
+	from, _ = svc.Create("key-from", "POST /accounts", from)
+	to, _ = svc.Create("key-to", "POST /accounts", to)
 
-	result, err := svc.Transfer("transfer-key", from.ID, to.ID, 300)
+	result, err := svc.Transfer("transfer-key", "POST /accounts/1/transfer", from.ID, to.ID, 300)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -194,10 +217,10 @@ func TestTransfer_InsufficientFunds(t *testing.T) {
 		Balance: 500, Currency: "GBP",
 	}
 
-	from, _ = svc.Create("key-f", from)
-	to, _ = svc.Create("key-t", to)
+	from, _ = svc.Create("key-f", "POST /accounts", from)
+	to, _ = svc.Create("key-t", "POST /accounts", to)
 
-	_, err := svc.Transfer("transfer-key", from.ID, to.ID, 200)
+	_, err := svc.Transfer("transfer-key", "POST /accounts/1/transfer", from.ID, to.ID, 200)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -215,9 +238,9 @@ func TestTransfer_SameAccount(t *testing.T) {
 		AddressLine1: "1 St", City: "London", Postcode: "E1", Country: "UK",
 		Balance: 1000, Currency: "GBP",
 	}
-	account, _ = svc.Create("key-self", account)
+	account, _ = svc.Create("key-self", "POST /accounts", account)
 
-	_, err := svc.Transfer("transfer-self", account.ID, account.ID, 100)
+	_, err := svc.Transfer("transfer-self", "POST /accounts/1/transfer", account.ID, account.ID, 100)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -241,10 +264,10 @@ func TestTransfer_CurrencyMismatch(t *testing.T) {
 		Balance: 500, Currency: "EUR",
 	}
 
-	from, _ = svc.Create("key-gbp", from)
-	to, _ = svc.Create("key-eur", to)
+	from, _ = svc.Create("key-gbp", "POST /accounts", from)
+	to, _ = svc.Create("key-eur", "POST /accounts", to)
 
-	_, err := svc.Transfer("transfer-cross", from.ID, to.ID, 100)
+	_, err := svc.Transfer("transfer-cross", "POST /accounts/1/transfer", from.ID, to.ID, 100)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

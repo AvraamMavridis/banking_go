@@ -18,9 +18,9 @@ import (
 
 type AccountServicer interface {
 	FindByID(id uint) (*entities.Account, error)
-	Create(idempotencyKey string, account *entities.Account) (*entities.Account, error)
-	Deposit(idempotencyKey string, id uint, amount int64) (*entities.Account, error)
-	Transfer(idempotencyKey string, fromID, toID uint, amount int64) (*entities.TransferResult, error)
+	Create(idempotencyKey string, fingerprint string, account *entities.Account) (*entities.Account, error)
+	Deposit(idempotencyKey string, fingerprint string, id uint, amount int64) (*entities.Account, error)
+	Transfer(idempotencyKey string, fingerprint string, fromID, toID uint, amount int64) (*entities.TransferResult, error)
 }
 
 type AccountHandler struct {
@@ -116,7 +116,7 @@ func (h *AccountHandler) Create(ctx *gofr.Context) (any, error) {
 	}
 
 	idempotencyKey := getIdempotencyKey(ctx)
-	saved, err := h.service.Create(idempotencyKey, account)
+	saved, err := h.service.Create(idempotencyKey, "POST /accounts", account)
 	if err != nil {
 		return handleDuplicateRequest(err)
 	}
@@ -143,7 +143,7 @@ func (h *AccountHandler) Deposit(ctx *gofr.Context) (any, error) {
 	}
 
 	idempotencyKey := getIdempotencyKey(ctx)
-	saved, err := h.service.Deposit(idempotencyKey, uint(id), req.Amount)
+	saved, err := h.service.Deposit(idempotencyKey, "POST /accounts/{id}/deposit", uint(id), req.Amount)
 	if err != nil {
 		return handleDuplicateRequest(err)
 	}
@@ -170,7 +170,7 @@ func (h *AccountHandler) Transfer(ctx *gofr.Context) (any, error) {
 	}
 
 	idempotencyKey := getIdempotencyKey(ctx)
-	result, err := h.service.Transfer(idempotencyKey, uint(id), req.ToAccountID, req.Amount)
+	result, err := h.service.Transfer(idempotencyKey, "POST /accounts/{id}/transfer", uint(id), req.ToAccountID, req.Amount)
 	if err != nil {
 		return handleDuplicateRequest(err)
 	}
@@ -184,6 +184,7 @@ func getIdempotencyKey(ctx *gofr.Context) string {
 	}
 	return ""
 }
+
 
 func handleDuplicateRequest(err error) (any, error) {
 	var dup *apperrors.DuplicateRequest

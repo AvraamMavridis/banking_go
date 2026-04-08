@@ -1,6 +1,6 @@
 # Bank Account API
 
-- Since one of the requirements was to run on any machine I decided to used docker, having it as the only requirement.
+- Since one of the requirements was to run on any machine I decided to used docker, having it as the only prerequisite.
 - I assumed that the API is for server-to-server communication, that's why I chose to use simple API keys for authentication, so `X-API-Key` is expected.
 - I followed the pattern of idempotancy keys on headers to avoid duplicate side effects when a request is retried, so a `Idempotency-Key` is expected.
 - Idempotency logic is extracted into its own `IdempotencyService` so it can be reused across different services without duplication.

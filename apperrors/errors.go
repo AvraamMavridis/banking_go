@@ -58,3 +58,13 @@ type DuplicateRequest struct {
 func (e *DuplicateRequest) Error() string {
 	return "Duplicate request"
 }
+
+type IdempotencyKeyReused struct{}
+
+func (e *IdempotencyKeyReused) Error() string {
+	return "Idempotency key already used for a different request"
+}
+
+func (e *IdempotencyKeyReused) StatusCode() int {
+	return http.StatusUnprocessableEntity
+}
