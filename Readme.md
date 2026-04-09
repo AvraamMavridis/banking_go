@@ -1,16 +1,15 @@
 # Bank Account API
 
 - Since one of the requirements was to run on any machine I decided to used docker, having it as the only prerequisite.
-- I assumed that the API is for server-to-server communication, that's why I chose to use simple API keys for authentication, so `X-API-Key` is expected.
-- I followed the pattern of idempotancy keys on headers to avoid duplicate side effects when a request is retried, so a `Idempotency-Key` is expected. For convinience and as part of this challenge it is required on every request, in practice it should/could be skipped on GETs.
-- Idempotency logic is extracted into its own `IdempotencyService` so it can be reused across different services without duplication, althugh at the moment we have only AccountService.
+- I assumed that the API is for server-to-server communication, that's why I chose to use simple API keys for authentication, so `X-API-Key` is expected as header.
+- I followed the pattern of idempotancy keys on headers to avoid duplicate side effects when a request is retried, so a `Idempotency-Key` header is expected. For convinience and as part of this challenge it is required on every request, in practice it should/could be skipped on GETs.
+- Idempotency logic is extracted into its own `IdempotencyService` so it can be reused across different services without duplication, althugh at the moment we have only account service.
 - The Account entity accepts currency declaring the main currency of an account, but haven't implemented logic to convert amounts across currencies because that would require connecting to a service that provides live exchange rates.
-- The amounts are store in cents, for example 1050 means 10.50 euro.
+- The amounts are store in cents, for example 1050 means 10.50 euro, that's a pattern I used in Klarna.
 - In a production environment I would swap SQLite for PostgreSQL, but for the scope of this challenge SQLite keeps things simple and portable.
 - I added a basic health endpoint that in a production like enviroment would had to connect to DB/cache etc and be used as Kubernetes liveness/readiness probe or any container orchestration health check
 - Deposits and transfers use database transactions to ensure atomicity.
 - Input validation is handled at the handler layer using `go-playground/validator`, while business rules (e.g. insufficient funds) are enforced in the service layer. I chose this package because is quite similar to Joi that I had used in the past and like for its simplicity.
-- Deposits and transfers use database transactions to ensure atomicity.
 - Tests do not cover low-level database failure scenarios (e.g. an UPDATE returning a DB error) since forcing those reliably with SQLite in-memory requires dropping tables or similar hacks that don't reflect real failure modes. In a production setup with PostgreSQL, these would be better covered with integration tests against a real database.
 - Added only endpoints that where required by the instructions e.g. there is no withdrawal endpoint.
 - I am not super familiar with Go frameworks so I followed patterns that I would have used if I was developing this in Typescript/NodeJS or Ruby on Rails. There is a ts_solution folder where I had started drafting how I would have solved it in NodeJS before switching to Go.
@@ -47,12 +46,10 @@ go build -o bank_api_go .
 ## Test
 
 ```bash
-go test ./...
+go test -cover ./...
 ```
 
 ## API Endpoints
-
-All endpoints require the `X-API-Key` header. Write endpoints also require an `Idempotency-Key` header (UUID v4).
 
 ### Health Check
 
