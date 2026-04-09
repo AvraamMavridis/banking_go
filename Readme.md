@@ -8,6 +8,9 @@
 - The amounts are store in cents, for example 1050 means 10.50 euro.
 - In a production environment I would swap SQLite for PostgreSQL, but for the scope of this challenge SQLite keeps things simple and portable.
 - I added a basic health endpoint that in a production like enviroment would had to connect to DB/cache etc and be used as Kubernetes liveness/readiness probe or any container orchestration health check
+- Deposits and transfers use database transactions to ensure atomicity.
+- Input validation is handled at the handler layer using `go-playground/validator`, while business rules (e.g. insufficient funds) are enforced in the service layer. I chose this package because is quite similar to Joi that I had used in the past and like for its simplicity.
+- Deposits and transfers use database transactions to ensure atomicity.
 - I am not super familiar with Go frameworks so I followed patterns that I would have used if I was developing this in HapiJS or Ruby on Rails.
 
 
@@ -120,10 +123,3 @@ curl -X POST http://localhost:8000/accounts/1/transfer \
   -H "Content-Type: application/json" \
   -d '{"toAccountId": 2, "amount": 300}'
 ```
-
-## Design Decisions
-
-- **Idempotency**: All write operations support idempotent retries via a UUID-based `Idempotency-Key` header. Duplicate requests return the cached response.
-- **Transactions**: Deposits and transfers use database transactions to ensure atomicity.
-- **Balance as integer**: Balances are stored as integers (smallest currency unit, e.g. cents) to avoid floating-point precision issues.
-- **Validation**: Input validation is handled at the handler layer using `go-playground/validator`, while business rules (e.g. insufficient funds) are enforced in the service layer.
