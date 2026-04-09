@@ -2,8 +2,6 @@ package routes
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -118,7 +116,7 @@ func (h *AccountHandler) Create(ctx *gofr.Context) (any, error) {
 	idempotencyKey := getIdempotencyKey(ctx)
 	saved, err := h.service.Create(idempotencyKey, "POST /accounts", account)
 	if err != nil {
-		return handleDuplicateRequest(err)
+		return nil, err
 	}
 
 	return response.Raw{Data: saved}, nil
@@ -145,7 +143,7 @@ func (h *AccountHandler) Deposit(ctx *gofr.Context) (any, error) {
 	idempotencyKey := getIdempotencyKey(ctx)
 	saved, err := h.service.Deposit(idempotencyKey, "POST /accounts/{id}/deposit", uint(id), req.Amount)
 	if err != nil {
-		return handleDuplicateRequest(err)
+		return nil, err
 	}
 
 	return response.Raw{Data: saved}, nil
@@ -172,7 +170,7 @@ func (h *AccountHandler) Transfer(ctx *gofr.Context) (any, error) {
 	idempotencyKey := getIdempotencyKey(ctx)
 	result, err := h.service.Transfer(idempotencyKey, "POST /accounts/{id}/transfer", uint(id), req.ToAccountID, req.Amount)
 	if err != nil {
-		return handleDuplicateRequest(err)
+		return nil, err
 	}
 
 	return response.Raw{Data: result}, nil
@@ -183,20 +181,6 @@ func getIdempotencyKey(ctx *gofr.Context) string {
 		return key
 	}
 	return ""
-}
-
-
-func handleDuplicateRequest(err error) (any, error) {
-	var dup *apperrors.DuplicateRequest
-	if !errors.As(err, &dup) {
-		return nil, err
-	}
-
-	var data any
-	if err := json.Unmarshal(dup.CachedResponse, &data); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal cached response: %w", err)
-	}
-	return response.Raw{Data: data}, nil
 }
 
 func formatValidationErrors(errs validator.ValidationErrors) string {

@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 
 	"bank_api_go/apperrors"
 	"bank_api_go/entities"
@@ -17,14 +18,18 @@ func NewIdempotencyService() *IdempotencyService {
 
 func (s *IdempotencyService) EnsureUnique(tx *gorm.DB, key string, fingerprint string) error {
 	var record entities.IdempotencyRecord
-	if err := tx.Where("key = ?", key).First(&record).Error; err == nil {
+	err := tx.Where("key = ?", key).First(&record).Error
+	if err == nil {
 		if record.Fingerprint != fingerprint {
 			return &apperrors.IdempotencyKeyReused{}
 		}
 		return &apperrors.DuplicateRequest{
-			StatusCode:     record.StatusCode,
-			CachedResponse: json.RawMessage(record.Response),
+			CachedStatusCode: record.StatusCode,
+			CachedResponse:   json.RawMessage(record.Response),
 		}
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
 	}
 	return nil
 }

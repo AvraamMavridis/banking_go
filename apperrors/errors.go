@@ -51,12 +51,22 @@ func (e *InsufficientFunds) StatusCode() int {
 }
 
 type DuplicateRequest struct {
-	StatusCode     int
-	CachedResponse json.RawMessage
+	CachedStatusCode int
+	CachedResponse   json.RawMessage
 }
 
 func (e *DuplicateRequest) Error() string {
 	return "Duplicate request"
+}
+
+func (e *DuplicateRequest) StatusCode() int {
+	return e.CachedStatusCode
+}
+
+func (e *DuplicateRequest) Response() map[string]any {
+	var data any
+	_ = json.Unmarshal(e.CachedResponse, &data)
+	return map[string]any{"cachedResponse": data}
 }
 
 type IdempotencyKeyReused struct{}
