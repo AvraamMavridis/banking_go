@@ -13,6 +13,7 @@
 - Tests do not cover low-level database failure scenarios (e.g. an UPDATE returning a DB error) since forcing those reliably with SQLite in-memory requires dropping tables or similar hacks that don't reflect real failure modes. In a production setup with PostgreSQL, these would be better covered with integration tests against a real database.
 - Added only endpoints that where required by the instructions e.g. there is no withdrawal endpoint.
 - I am not super familiar with Go frameworks so I followed patterns that I would have used if I was developing this in Typescript/NodeJS or Ruby on Rails. There is a ts_solution folder where I had started drafting how I would have solved it in NodeJS before switching to Go.
+- I tried to keep it simple / pragmatic, no Auditlogs for example or tracing, PII handling, Idempotency key TTL/cleanup etc etc.
 
 
 ## Prerequisites
