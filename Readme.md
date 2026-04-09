@@ -28,8 +28,9 @@ docker run -p 8000:8000 -e API_KEY=your-secret-key bank-api
 ## Run locally
 
 ```bash
-# Create a .env file
-echo 'API_KEY=your-secret-key' > .env
+# Create a .env file from the example
+cp .env.example .env
+# Edit .env and set your API key
 
 # Run
 go run main.go

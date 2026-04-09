@@ -1,6 +1,8 @@
 package services
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 
 	"bank_api_go/apperrors"
@@ -246,6 +248,116 @@ func TestTransfer_SameAccount(t *testing.T) {
 	}
 	if _, ok := err.(*apperrors.BadRequest); !ok {
 		t.Fatalf("expected *apperrors.BadRequest, got %T", err)
+	}
+}
+
+func TestTransfer_SourceNotFound(t *testing.T) {
+	db := setupTestDB(t)
+	svc := NewAccountService(db, NewIdempotencyService())
+
+	to := &entities.Account{
+		Name: "To", Surname: "User", Email: "to@example.com",
+		AddressLine1: "2 St", City: "London", Postcode: "E2", Country: "UK",
+		Balance: 500, Currency: "GBP",
+	}
+	to, _ = svc.Create("key-to", "POST /accounts", to)
+
+	_, err := svc.Transfer("transfer-key", "POST /accounts/999/transfer", 999, to.ID, 100)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if _, ok := err.(*apperrors.AccountNotFound); !ok {
+		t.Fatalf("expected *apperrors.AccountNotFound, got %T", err)
+	}
+}
+
+func TestTransfer_DestinationNotFound(t *testing.T) {
+	db := setupTestDB(t)
+	svc := NewAccountService(db, NewIdempotencyService())
+
+	from := &entities.Account{
+		Name: "From", Surname: "User", Email: "from@example.com",
+		AddressLine1: "1 St", City: "London", Postcode: "E1", Country: "UK",
+		Balance: 1000, Currency: "GBP",
+	}
+	from, _ = svc.Create("key-from", "POST /accounts", from)
+
+	_, err := svc.Transfer("transfer-key", "POST /accounts/1/transfer", from.ID, 999, 100)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if _, ok := err.(*apperrors.AccountNotFound); !ok {
+		t.Fatalf("expected *apperrors.AccountNotFound, got %T", err)
+	}
+}
+
+func TestTransfer_ConcurrentTransfersNoOverdraft(t *testing.T) {
+	// Use shared-cache in-memory SQLite with busy timeout to handle concurrent access
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared&_busy_timeout=5000"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("failed to open test db: %v", err)
+	}
+	if err := db.AutoMigrate(&entities.Account{}, &entities.IdempotencyRecord{}); err != nil {
+		t.Fatalf("failed to migrate: %v", err)
+	}
+	// Limit to one open connection so SQLite serializes transactions properly
+	sqlDB, _ := db.DB()
+	sqlDB.SetMaxOpenConns(1)
+
+	svc := NewAccountService(db, NewIdempotencyService())
+
+	from := &entities.Account{
+		Name: "From", Surname: "User", Email: "from@example.com",
+		AddressLine1: "1 St", City: "London", Postcode: "E1", Country: "UK",
+		Balance: 1000, Currency: "GBP",
+	}
+	to := &entities.Account{
+		Name: "To", Surname: "User", Email: "to@example.com",
+		AddressLine1: "2 St", City: "London", Postcode: "E2", Country: "UK",
+		Balance: 0, Currency: "GBP",
+	}
+
+	from, _ = svc.Create("key-from", "POST /accounts", from)
+	to, _ = svc.Create("key-to", "POST /accounts", to)
+
+	// Attempt 10 concurrent transfers of 200 each from an account with 1000 balance.
+	// With serialized access, exactly 5 should succeed and 5 should fail with InsufficientFunds.
+	concurrency := 10
+	var wg sync.WaitGroup
+	results := make(chan error, concurrency)
+
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			key := fmt.Sprintf("concurrent-key-%d", index)
+			_, err := svc.Transfer(key, "POST /accounts/1/transfer", from.ID, to.ID, 200)
+			results <- err
+		}(i)
+	}
+
+	wg.Wait()
+	close(results)
+
+	successCount := 0
+	for err := range results {
+		if err == nil {
+			successCount++
+		}
+	}
+
+	// Verify invariants: no overdraft and money is conserved
+	finalFrom, _ := svc.FindByID(from.ID)
+	finalTo, _ := svc.FindByID(to.ID)
+
+	if finalFrom.Balance < 0 {
+		t.Fatalf("overdraft detected: source balance is %d", finalFrom.Balance)
+	}
+	if finalFrom.Balance+finalTo.Balance != 1000 {
+		t.Fatalf("money not conserved: source=%d + dest=%d != 1000", finalFrom.Balance, finalTo.Balance)
+	}
+	if successCount != 5 {
+		t.Fatalf("expected 5 successful transfers, got %d", successCount)
 	}
 }
 

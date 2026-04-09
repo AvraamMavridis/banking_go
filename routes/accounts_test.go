@@ -286,6 +286,20 @@ func TestDeposit_InvalidAmount(t *testing.T) {
 	}
 }
 
+func TestDeposit_NegativeAmount(t *testing.T) {
+	handler := NewAccountHandler(&mockAccountService{})
+	body := []byte(`{"amount": -100}`)
+	ctx := newTestContext("POST", "/accounts/1/deposit", map[string]string{"id": "1"}, body)
+
+	_, err := handler.Deposit(ctx)
+	if err == nil {
+		t.Fatal("expected error for negative amount, got nil")
+	}
+	if _, ok := err.(*apperrors.BadRequest); !ok {
+		t.Fatalf("expected *apperrors.BadRequest, got %T", err)
+	}
+}
+
 func TestDeposit_InvalidJSON(t *testing.T) {
 	handler := NewAccountHandler(&mockAccountService{})
 	ctx := newTestContext("POST", "/accounts/1/deposit", map[string]string{"id": "1"}, []byte(`{bad`))
@@ -392,6 +406,20 @@ func TestTransfer_InvalidAmount(t *testing.T) {
 	_, err := handler.Transfer(ctx)
 	if err == nil {
 		t.Fatal("expected error for zero amount, got nil")
+	}
+	if _, ok := err.(*apperrors.BadRequest); !ok {
+		t.Fatalf("expected *apperrors.BadRequest, got %T", err)
+	}
+}
+
+func TestTransfer_NegativeAmount(t *testing.T) {
+	handler := NewAccountHandler(&mockAccountService{})
+	body := []byte(`{"toAccountId": 2, "amount": -50}`)
+	ctx := newTestContext("POST", "/accounts/1/transfer", map[string]string{"id": "1"}, body)
+
+	_, err := handler.Transfer(ctx)
+	if err == nil {
+		t.Fatal("expected error for negative amount, got nil")
 	}
 	if _, ok := err.(*apperrors.BadRequest); !ok {
 		t.Fatalf("expected *apperrors.BadRequest, got %T", err)
