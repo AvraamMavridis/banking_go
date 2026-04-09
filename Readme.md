@@ -11,9 +11,9 @@
 - Deposits and transfers use database transactions to ensure atomicity.
 - Input validation is handled at the handler layer using `go-playground/validator`, while business rules (e.g. insufficient funds) are enforced in the service layer. I chose this package because is quite similar to Joi that I had used in the past and like for its simplicity.
 - Deposits and transfers use database transactions to ensure atomicity.
-- I am not super familiar with Go frameworks so I followed patterns that I would have used if I was developing this in HapiJS or Ruby on Rails.
 - Tests do not cover low-level database failure scenarios (e.g. an UPDATE returning a DB error) since forcing those reliably with SQLite in-memory requires dropping tables or similar hacks that don't reflect real failure modes. In a production setup with PostgreSQL, these would be better covered with integration tests against a real database.
 - Added only endpoints that where required by the instructions e.g. there is no withdrawal endpoint.
+- I am not super familiar with Go frameworks so I followed patterns that I would have used if I was developing this in Typescript/NodeJS or Ruby on Rails. There is a ts_solution folder where I had started drafting how I would have solved it in NodeJS before switching to Go.
 
 
 ## Prerequisites
