@@ -21,36 +21,36 @@ import (
 // mockAccountService implements AccountServicer for testing.
 type mockAccountService struct {
 	findByIDFn func(id uint) (*entities.Account, error)
-	createFn   func(key, fp string, a *entities.Account) (*entities.Account, error)
+	createFn   func(key, fp string, account *entities.Account) (*entities.Account, error)
 	depositFn  func(key, fp string, id uint, amount int64) (*entities.Account, error)
 	transferFn func(key, fp string, from, to uint, amount int64) (*entities.TransferResult, error)
 }
 
-func (m *mockAccountService) FindByID(id uint) (*entities.Account, error) {
-	if m.findByIDFn != nil {
-		return m.findByIDFn(id)
+func (mock *mockAccountService) FindByID(id uint) (*entities.Account, error) {
+	if mock.findByIDFn != nil {
+		return mock.findByIDFn(id)
 	}
 	return &entities.Account{ID: id, Name: "Test"}, nil
 }
 
-func (m *mockAccountService) Create(key, fp string, a *entities.Account) (*entities.Account, error) {
-	if m.createFn != nil {
-		return m.createFn(key, fp, a)
+func (mock *mockAccountService) Create(key, fp string, account *entities.Account) (*entities.Account, error) {
+	if mock.createFn != nil {
+		return mock.createFn(key, fp, account)
 	}
-	a.ID = 1
-	return a, nil
+	account.ID = 1
+	return account, nil
 }
 
-func (m *mockAccountService) Deposit(key, fp string, id uint, amount int64) (*entities.Account, error) {
-	if m.depositFn != nil {
-		return m.depositFn(key, fp, id, amount)
+func (mock *mockAccountService) Deposit(key, fp string, id uint, amount int64) (*entities.Account, error) {
+	if mock.depositFn != nil {
+		return mock.depositFn(key, fp, id, amount)
 	}
 	return &entities.Account{ID: id, Balance: amount}, nil
 }
 
-func (m *mockAccountService) Transfer(key, fp string, from, to uint, amount int64) (*entities.TransferResult, error) {
-	if m.transferFn != nil {
-		return m.transferFn(key, fp, from, to, amount)
+func (mock *mockAccountService) Transfer(key, fp string, from, to uint, amount int64) (*entities.TransferResult, error) {
+	if mock.transferFn != nil {
+		return mock.transferFn(key, fp, from, to, amount)
 	}
 	return &entities.TransferResult{
 		From: entities.Account{ID: from, Balance: 700},
@@ -85,10 +85,10 @@ func newTestContext(method, path string, pathVars map[string]string, body []byte
 // --- GetByID tests ---
 
 func TestGetByID_Success(t *testing.T) {
-	h := NewAccountHandler(&mockAccountService{})
+	handler := NewAccountHandler(&mockAccountService{})
 	ctx := newTestContext("GET", "/accounts/1", map[string]string{"id": "1"}, nil)
 
-	data, err := h.GetByID(ctx)
+	data, err := handler.GetByID(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -108,10 +108,10 @@ func TestGetByID_Success(t *testing.T) {
 }
 
 func TestGetByID_InvalidID(t *testing.T) {
-	h := NewAccountHandler(&mockAccountService{})
+	handler := NewAccountHandler(&mockAccountService{})
 	ctx := newTestContext("GET", "/accounts/abc", map[string]string{"id": "abc"}, nil)
 
-	_, err := h.GetByID(ctx)
+	_, err := handler.GetByID(ctx)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -126,10 +126,10 @@ func TestGetByID_NotFound(t *testing.T) {
 			return nil, &apperrors.AccountNotFound{Message: "Account not found"}
 		},
 	}
-	h := NewAccountHandler(svc)
+	handler := NewAccountHandler(svc)
 	ctx := newTestContext("GET", "/accounts/999", map[string]string{"id": "999"}, nil)
 
-	_, err := h.GetByID(ctx)
+	_, err := handler.GetByID(ctx)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -141,14 +141,14 @@ func TestGetByID_NotFound(t *testing.T) {
 // --- Create tests ---
 
 func TestCreate_Success(t *testing.T) {
-	h := NewAccountHandler(&mockAccountService{})
+	handler := NewAccountHandler(&mockAccountService{})
 	body := []byte(`{
 		"name": "John", "surname": "Doe", "email": "john@example.com",
 		"addressLine1": "123 Main St", "city": "London", "postcode": "SW1A 1AA", "country": "UK"
 	}`)
 	ctx := newTestContext("POST", "/accounts", nil, body)
 
-	data, err := h.Create(ctx)
+	data, err := handler.Create(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -171,12 +171,12 @@ func TestCreate_Success(t *testing.T) {
 }
 
 func TestCreate_ValidationError_MissingName(t *testing.T) {
-	h := NewAccountHandler(&mockAccountService{})
+	handler := NewAccountHandler(&mockAccountService{})
 	body := []byte(`{"surname": "Doe", "email": "john@example.com",
 		"addressLine1": "123 Main St", "city": "London", "postcode": "SW1A 1AA", "country": "UK"}`)
 	ctx := newTestContext("POST", "/accounts", nil, body)
 
-	_, err := h.Create(ctx)
+	_, err := handler.Create(ctx)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -186,12 +186,12 @@ func TestCreate_ValidationError_MissingName(t *testing.T) {
 }
 
 func TestCreate_ValidationError_InvalidEmail(t *testing.T) {
-	h := NewAccountHandler(&mockAccountService{})
+	handler := NewAccountHandler(&mockAccountService{})
 	body := []byte(`{"name": "John", "surname": "Doe", "email": "not-an-email",
 		"addressLine1": "123 Main St", "city": "London", "postcode": "SW1A 1AA", "country": "UK"}`)
 	ctx := newTestContext("POST", "/accounts", nil, body)
 
-	_, err := h.Create(ctx)
+	_, err := handler.Create(ctx)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -201,10 +201,10 @@ func TestCreate_ValidationError_InvalidEmail(t *testing.T) {
 }
 
 func TestCreate_InvalidJSON(t *testing.T) {
-	h := NewAccountHandler(&mockAccountService{})
+	handler := NewAccountHandler(&mockAccountService{})
 	ctx := newTestContext("POST", "/accounts", nil, []byte(`{invalid`))
 
-	_, err := h.Create(ctx)
+	_, err := handler.Create(ctx)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -216,19 +216,19 @@ func TestCreate_InvalidJSON(t *testing.T) {
 func TestCreate_CustomCurrency(t *testing.T) {
 	var capturedCurrency string
 	svc := &mockAccountService{
-		createFn: func(key, fp string, a *entities.Account) (*entities.Account, error) {
-			capturedCurrency = a.Currency
-			a.ID = 1
-			return a, nil
+		createFn: func(key, fp string, account *entities.Account) (*entities.Account, error) {
+			capturedCurrency = account.Currency
+			account.ID = 1
+			return account, nil
 		},
 	}
-	h := NewAccountHandler(svc)
+	handler := NewAccountHandler(svc)
 	body := []byte(`{"name": "John", "surname": "Doe", "email": "john@example.com",
 		"addressLine1": "123 Main St", "city": "London", "postcode": "SW1A 1AA", "country": "UK",
 		"currency": "GBP"}`)
 	ctx := newTestContext("POST", "/accounts", nil, body)
 
-	_, err := h.Create(ctx)
+	_, err := handler.Create(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -240,11 +240,11 @@ func TestCreate_CustomCurrency(t *testing.T) {
 // --- Deposit tests ---
 
 func TestDeposit_Success(t *testing.T) {
-	h := NewAccountHandler(&mockAccountService{})
+	handler := NewAccountHandler(&mockAccountService{})
 	body := []byte(`{"amount": 500}`)
 	ctx := newTestContext("POST", "/accounts/1/deposit", map[string]string{"id": "1"}, body)
 
-	data, err := h.Deposit(ctx)
+	data, err := handler.Deposit(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -259,11 +259,11 @@ func TestDeposit_Success(t *testing.T) {
 }
 
 func TestDeposit_InvalidID(t *testing.T) {
-	h := NewAccountHandler(&mockAccountService{})
+	handler := NewAccountHandler(&mockAccountService{})
 	body := []byte(`{"amount": 500}`)
 	ctx := newTestContext("POST", "/accounts/abc/deposit", map[string]string{"id": "abc"}, body)
 
-	_, err := h.Deposit(ctx)
+	_, err := handler.Deposit(ctx)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -273,11 +273,11 @@ func TestDeposit_InvalidID(t *testing.T) {
 }
 
 func TestDeposit_InvalidAmount(t *testing.T) {
-	h := NewAccountHandler(&mockAccountService{})
+	handler := NewAccountHandler(&mockAccountService{})
 	body := []byte(`{"amount": 0}`)
 	ctx := newTestContext("POST", "/accounts/1/deposit", map[string]string{"id": "1"}, body)
 
-	_, err := h.Deposit(ctx)
+	_, err := handler.Deposit(ctx)
 	if err == nil {
 		t.Fatal("expected error for zero amount, got nil")
 	}
@@ -287,10 +287,10 @@ func TestDeposit_InvalidAmount(t *testing.T) {
 }
 
 func TestDeposit_InvalidJSON(t *testing.T) {
-	h := NewAccountHandler(&mockAccountService{})
+	handler := NewAccountHandler(&mockAccountService{})
 	ctx := newTestContext("POST", "/accounts/1/deposit", map[string]string{"id": "1"}, []byte(`{bad`))
 
-	_, err := h.Deposit(ctx)
+	_, err := handler.Deposit(ctx)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -305,11 +305,11 @@ func TestDeposit_ServiceError(t *testing.T) {
 			return nil, &apperrors.AccountNotFound{Message: "Account not found"}
 		},
 	}
-	h := NewAccountHandler(svc)
+	handler := NewAccountHandler(svc)
 	body := []byte(`{"amount": 500}`)
 	ctx := newTestContext("POST", "/accounts/999/deposit", map[string]string{"id": "999"}, body)
 
-	_, err := h.Deposit(ctx)
+	_, err := handler.Deposit(ctx)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -321,11 +321,11 @@ func TestDeposit_ServiceError(t *testing.T) {
 // --- Transfer tests ---
 
 func TestTransfer_Success(t *testing.T) {
-	h := NewAccountHandler(&mockAccountService{})
+	handler := NewAccountHandler(&mockAccountService{})
 	body := []byte(`{"toAccountId": 2, "amount": 300}`)
 	ctx := newTestContext("POST", "/accounts/1/transfer", map[string]string{"id": "1"}, body)
 
-	data, err := h.Transfer(ctx)
+	data, err := handler.Transfer(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -344,11 +344,11 @@ func TestTransfer_Success(t *testing.T) {
 }
 
 func TestTransfer_InvalidID(t *testing.T) {
-	h := NewAccountHandler(&mockAccountService{})
+	handler := NewAccountHandler(&mockAccountService{})
 	body := []byte(`{"toAccountId": 2, "amount": 300}`)
 	ctx := newTestContext("POST", "/accounts/abc/transfer", map[string]string{"id": "abc"}, body)
 
-	_, err := h.Transfer(ctx)
+	_, err := handler.Transfer(ctx)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -358,10 +358,10 @@ func TestTransfer_InvalidID(t *testing.T) {
 }
 
 func TestTransfer_InvalidJSON(t *testing.T) {
-	h := NewAccountHandler(&mockAccountService{})
+	handler := NewAccountHandler(&mockAccountService{})
 	ctx := newTestContext("POST", "/accounts/1/transfer", map[string]string{"id": "1"}, []byte(`{bad`))
 
-	_, err := h.Transfer(ctx)
+	_, err := handler.Transfer(ctx)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -371,11 +371,11 @@ func TestTransfer_InvalidJSON(t *testing.T) {
 }
 
 func TestTransfer_MissingToAccountID(t *testing.T) {
-	h := NewAccountHandler(&mockAccountService{})
+	handler := NewAccountHandler(&mockAccountService{})
 	body := []byte(`{"amount": 300}`)
 	ctx := newTestContext("POST", "/accounts/1/transfer", map[string]string{"id": "1"}, body)
 
-	_, err := h.Transfer(ctx)
+	_, err := handler.Transfer(ctx)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -385,11 +385,11 @@ func TestTransfer_MissingToAccountID(t *testing.T) {
 }
 
 func TestTransfer_InvalidAmount(t *testing.T) {
-	h := NewAccountHandler(&mockAccountService{})
+	handler := NewAccountHandler(&mockAccountService{})
 	body := []byte(`{"toAccountId": 2, "amount": 0}`)
 	ctx := newTestContext("POST", "/accounts/1/transfer", map[string]string{"id": "1"}, body)
 
-	_, err := h.Transfer(ctx)
+	_, err := handler.Transfer(ctx)
 	if err == nil {
 		t.Fatal("expected error for zero amount, got nil")
 	}
@@ -404,11 +404,11 @@ func TestTransfer_ServiceError(t *testing.T) {
 			return nil, &apperrors.InsufficientFunds{}
 		},
 	}
-	h := NewAccountHandler(svc)
+	handler := NewAccountHandler(svc)
 	body := []byte(`{"toAccountId": 2, "amount": 300}`)
 	ctx := newTestContext("POST", "/accounts/1/transfer", map[string]string{"id": "1"}, body)
 
-	_, err := h.Transfer(ctx)
+	_, err := handler.Transfer(ctx)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -422,18 +422,18 @@ func TestTransfer_ServiceError(t *testing.T) {
 func TestCreate_PassesCorrectFingerprint(t *testing.T) {
 	var capturedFingerprint string
 	svc := &mockAccountService{
-		createFn: func(key, fp string, a *entities.Account) (*entities.Account, error) {
+		createFn: func(key, fp string, account *entities.Account) (*entities.Account, error) {
 			capturedFingerprint = fp
-			a.ID = 1
-			return a, nil
+			account.ID = 1
+			return account, nil
 		},
 	}
-	h := NewAccountHandler(svc)
+	handler := NewAccountHandler(svc)
 	body := []byte(`{"name": "John", "surname": "Doe", "email": "john@example.com",
 		"addressLine1": "123 Main St", "city": "London", "postcode": "SW1A 1AA", "country": "UK"}`)
 	ctx := newTestContext("POST", "/accounts", nil, body)
 
-	_, err := h.Create(ctx)
+	_, err := handler.Create(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -450,11 +450,11 @@ func TestDeposit_PassesCorrectFingerprint(t *testing.T) {
 			return &entities.Account{ID: id, Balance: amount}, nil
 		},
 	}
-	h := NewAccountHandler(svc)
+	handler := NewAccountHandler(svc)
 	body := []byte(`{"amount": 500}`)
 	ctx := newTestContext("POST", "/accounts/1/deposit", map[string]string{"id": "1"}, body)
 
-	_, err := h.Deposit(ctx)
+	_, err := handler.Deposit(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -471,11 +471,11 @@ func TestTransfer_PassesCorrectFingerprint(t *testing.T) {
 			return &entities.TransferResult{}, nil
 		},
 	}
-	h := NewAccountHandler(svc)
+	handler := NewAccountHandler(svc)
 	body := []byte(`{"toAccountId": 2, "amount": 300}`)
 	ctx := newTestContext("POST", "/accounts/1/transfer", map[string]string{"id": "1"}, body)
 
-	_, err := h.Transfer(ctx)
+	_, err := handler.Transfer(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

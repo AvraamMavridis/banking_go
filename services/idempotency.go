@@ -16,7 +16,7 @@ func NewIdempotencyService() *IdempotencyService {
 	return &IdempotencyService{}
 }
 
-func (s *IdempotencyService) EnsureUnique(tx *gorm.DB, key string, fingerprint string) error {
+func (service *IdempotencyService) EnsureUnique(tx *gorm.DB, key string, fingerprint string) error {
 	var record entities.IdempotencyRecord
 	err := tx.Where("key = ?", key).First(&record).Error
 	if err == nil {
@@ -34,7 +34,7 @@ func (s *IdempotencyService) EnsureUnique(tx *gorm.DB, key string, fingerprint s
 	return nil
 }
 
-func (s *IdempotencyService) Save(tx *gorm.DB, key string, fingerprint string, statusCode int, response any) error {
+func (service *IdempotencyService) Save(tx *gorm.DB, key string, fingerprint string, statusCode int, response any) error {
 	data, err := json.Marshal(response)
 	if err != nil {
 		return err

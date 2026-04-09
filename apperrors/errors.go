@@ -9,14 +9,14 @@ type AccountNotFound struct {
 	Message string
 }
 
-func (e *AccountNotFound) Error() string {
-	if e.Message == "" {
+func (err *AccountNotFound) Error() string {
+	if err.Message == "" {
 		return "Not Found"
 	}
-	return e.Message
+	return err.Message
 }
 
-func (e *AccountNotFound) StatusCode() int {
+func (err *AccountNotFound) StatusCode() int {
 	return http.StatusNotFound
 }
 
@@ -24,14 +24,14 @@ type BadRequest struct {
 	Message string
 }
 
-func (e *BadRequest) Error() string {
-	if e.Message == "" {
+func (err *BadRequest) Error() string {
+	if err.Message == "" {
 		return "Bad Request"
 	}
-	return e.Message
+	return err.Message
 }
 
-func (e *BadRequest) StatusCode() int {
+func (err *BadRequest) StatusCode() int {
 	return http.StatusBadRequest
 }
 
@@ -39,14 +39,14 @@ type InsufficientFunds struct {
 	Message string
 }
 
-func (e *InsufficientFunds) Error() string {
-	if e.Message == "" {
+func (err *InsufficientFunds) Error() string {
+	if err.Message == "" {
 		return "Insufficient funds"
 	}
-	return e.Message
+	return err.Message
 }
 
-func (e *InsufficientFunds) StatusCode() int {
+func (err *InsufficientFunds) StatusCode() int {
 	return http.StatusUnprocessableEntity
 }
 
@@ -55,26 +55,26 @@ type DuplicateRequest struct {
 	CachedResponse   json.RawMessage
 }
 
-func (e *DuplicateRequest) Error() string {
+func (err *DuplicateRequest) Error() string {
 	return "Duplicate request"
 }
 
-func (e *DuplicateRequest) StatusCode() int {
-	return e.CachedStatusCode
+func (err *DuplicateRequest) StatusCode() int {
+	return err.CachedStatusCode
 }
 
-func (e *DuplicateRequest) Response() map[string]any {
+func (err *DuplicateRequest) Response() map[string]any {
 	var data any
-	_ = json.Unmarshal(e.CachedResponse, &data)
+	_ = json.Unmarshal(err.CachedResponse, &data)
 	return map[string]any{"cachedResponse": data}
 }
 
 type IdempotencyKeyReused struct{}
 
-func (e *IdempotencyKeyReused) Error() string {
+func (err *IdempotencyKeyReused) Error() string {
 	return "Idempotency key already used for a different request"
 }
 
-func (e *IdempotencyKeyReused) StatusCode() int {
+func (err *IdempotencyKeyReused) StatusCode() int {
 	return http.StatusUnprocessableEntity
 }

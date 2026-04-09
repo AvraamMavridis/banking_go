@@ -16,17 +16,17 @@ func NewAccountService(db *gorm.DB, idempotency *IdempotencyService) *AccountSer
 	return &AccountService{db: db, idempotency: idempotency}
 }
 
-func (s *AccountService) FindByID(id uint) (*entities.Account, error) {
+func (service *AccountService) FindByID(id uint) (*entities.Account, error) {
 	var account entities.Account
-	if err := s.db.First(&account, id).Error; err != nil {
+	if err := service.db.First(&account, id).Error; err != nil {
 		return nil, &apperrors.AccountNotFound{Message: "Account not found"}
 	}
 	return &account, nil
 }
 
-func (s *AccountService) Create(idempotencyKey string, fingerprint string, account *entities.Account) (*entities.Account, error) {
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := s.idempotency.EnsureUnique(tx, idempotencyKey, fingerprint); err != nil {
+func (service *AccountService) Create(idempotencyKey string, fingerprint string, account *entities.Account) (*entities.Account, error) {
+	err := service.db.Transaction(func(tx *gorm.DB) error {
+		if err := service.idempotency.EnsureUnique(tx, idempotencyKey, fingerprint); err != nil {
 			return err
 		}
 
@@ -34,7 +34,7 @@ func (s *AccountService) Create(idempotencyKey string, fingerprint string, accou
 			return err
 		}
 
-		return s.idempotency.Save(tx, idempotencyKey, fingerprint, 201, account)
+		return service.idempotency.Save(tx, idempotencyKey, fingerprint, 201, account)
 	})
 	if err != nil {
 		return nil, err
@@ -43,10 +43,10 @@ func (s *AccountService) Create(idempotencyKey string, fingerprint string, accou
 	return account, nil
 }
 
-func (s *AccountService) Deposit(idempotencyKey string, fingerprint string, id uint, amount int64) (*entities.Account, error) {
+func (service *AccountService) Deposit(idempotencyKey string, fingerprint string, id uint, amount int64) (*entities.Account, error) {
 	var account entities.Account
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := s.idempotency.EnsureUnique(tx, idempotencyKey, fingerprint); err != nil {
+	err := service.db.Transaction(func(tx *gorm.DB) error {
+		if err := service.idempotency.EnsureUnique(tx, idempotencyKey, fingerprint); err != nil {
 			return err
 		}
 
@@ -64,7 +64,7 @@ func (s *AccountService) Deposit(idempotencyKey string, fingerprint string, id u
 			return err
 		}
 
-		return s.idempotency.Save(tx, idempotencyKey, fingerprint, 200, &account)
+		return service.idempotency.Save(tx, idempotencyKey, fingerprint, 200, &account)
 	})
 	if err != nil {
 		return nil, err
@@ -73,14 +73,14 @@ func (s *AccountService) Deposit(idempotencyKey string, fingerprint string, id u
 	return &account, nil
 }
 
-func (s *AccountService) Transfer(idempotencyKey string, fingerprint string, fromID, toID uint, amount int64) (*entities.TransferResult, error) {
+func (service *AccountService) Transfer(idempotencyKey string, fingerprint string, fromID, toID uint, amount int64) (*entities.TransferResult, error) {
 	if fromID == toID {
 		return nil, &apperrors.BadRequest{Message: "Cannot transfer to the same account"}
 	}
 
 	var result entities.TransferResult
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := s.idempotency.EnsureUnique(tx, idempotencyKey, fingerprint); err != nil {
+	err := service.db.Transaction(func(tx *gorm.DB) error {
+		if err := service.idempotency.EnsureUnique(tx, idempotencyKey, fingerprint); err != nil {
 			return err
 		}
 
@@ -122,7 +122,7 @@ func (s *AccountService) Transfer(idempotencyKey string, fingerprint string, fro
 			return err
 		}
 
-		return s.idempotency.Save(tx, idempotencyKey, fingerprint, 200, &result)
+		return service.idempotency.Save(tx, idempotencyKey, fingerprint, 200, &result)
 	})
 	if err != nil {
 		return nil, err

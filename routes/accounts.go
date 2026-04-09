@@ -33,15 +33,15 @@ func NewAccountHandler(service AccountServicer) *AccountHandler {
 	}
 }
 
-func (h *AccountHandler) Register(app *gofr.App, authMiddleware func(http.Handler) http.Handler) {
+func (handler *AccountHandler) Register(app *gofr.App, authMiddleware func(http.Handler) http.Handler) {
 	app.UseMiddleware(authMiddleware)
 
-	app.GET("/accounts/{id}", h.GetByID)
+	app.GET("/accounts/{id}", handler.GetByID)
 
 	app.UseMiddleware(middleware.RequireIdempotencyKey)
-	app.POST("/accounts", h.Create)
-	app.POST("/accounts/{id}/deposit", h.Deposit)
-	app.POST("/accounts/{id}/transfer", h.Transfer)
+	app.POST("/accounts", handler.Create)
+	app.POST("/accounts/{id}/deposit", handler.Deposit)
+	app.POST("/accounts/{id}/transfer", handler.Transfer)
 }
 
 type CreateAccountRequest struct {
@@ -67,13 +67,13 @@ type TransferRequest struct {
 	Amount      int64 `json:"amount" validate:"required,gt=0"`
 }
 
-func (h *AccountHandler) GetByID(ctx *gofr.Context) (any, error) {
+func (handler *AccountHandler) GetByID(ctx *gofr.Context) (any, error) {
 	id, err := strconv.ParseUint(ctx.PathParam("id"), 10, 64)
 	if err != nil {
 		return nil, &apperrors.BadRequest{Message: "Invalid account ID"}
 	}
 
-	account, err := h.service.FindByID(uint(id))
+	account, err := handler.service.FindByID(uint(id))
 	if err != nil {
 		return nil, err
 	}
@@ -81,13 +81,13 @@ func (h *AccountHandler) GetByID(ctx *gofr.Context) (any, error) {
 	return response.Raw{Data: account}, nil
 }
 
-func (h *AccountHandler) Create(ctx *gofr.Context) (any, error) {
+func (handler *AccountHandler) Create(ctx *gofr.Context) (any, error) {
 	var req CreateAccountRequest
 	if err := ctx.Bind(&req); err != nil {
 		return nil, &apperrors.BadRequest{Message: "Invalid JSON body"}
 	}
 
-	if err := h.validate.Struct(req); err != nil {
+	if err := handler.validate.Struct(req); err != nil {
 		if ve, ok := err.(validator.ValidationErrors); ok {
 			return nil, &apperrors.BadRequest{Message: formatValidationErrors(ve)}
 		}
@@ -114,7 +114,7 @@ func (h *AccountHandler) Create(ctx *gofr.Context) (any, error) {
 	}
 
 	idempotencyKey := getIdempotencyKey(ctx)
-	saved, err := h.service.Create(idempotencyKey, "POST /accounts", account)
+	saved, err := handler.service.Create(idempotencyKey, "POST /accounts", account)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (h *AccountHandler) Create(ctx *gofr.Context) (any, error) {
 	return response.Raw{Data: saved}, nil
 }
 
-func (h *AccountHandler) Deposit(ctx *gofr.Context) (any, error) {
+func (handler *AccountHandler) Deposit(ctx *gofr.Context) (any, error) {
 	id, err := strconv.ParseUint(ctx.PathParam("id"), 10, 64)
 	if err != nil {
 		return nil, &apperrors.BadRequest{Message: "Invalid account ID"}
@@ -133,7 +133,7 @@ func (h *AccountHandler) Deposit(ctx *gofr.Context) (any, error) {
 		return nil, &apperrors.BadRequest{Message: "Invalid JSON body"}
 	}
 
-	if err := h.validate.Struct(req); err != nil {
+	if err := handler.validate.Struct(req); err != nil {
 		if ve, ok := err.(validator.ValidationErrors); ok {
 			return nil, &apperrors.BadRequest{Message: formatValidationErrors(ve)}
 		}
@@ -141,7 +141,7 @@ func (h *AccountHandler) Deposit(ctx *gofr.Context) (any, error) {
 	}
 
 	idempotencyKey := getIdempotencyKey(ctx)
-	saved, err := h.service.Deposit(idempotencyKey, "POST /accounts/{id}/deposit", uint(id), req.Amount)
+	saved, err := handler.service.Deposit(idempotencyKey, "POST /accounts/{id}/deposit", uint(id), req.Amount)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (h *AccountHandler) Deposit(ctx *gofr.Context) (any, error) {
 	return response.Raw{Data: saved}, nil
 }
 
-func (h *AccountHandler) Transfer(ctx *gofr.Context) (any, error) {
+func (handler *AccountHandler) Transfer(ctx *gofr.Context) (any, error) {
 	id, err := strconv.ParseUint(ctx.PathParam("id"), 10, 64)
 	if err != nil {
 		return nil, &apperrors.BadRequest{Message: "Invalid account ID"}
@@ -160,7 +160,7 @@ func (h *AccountHandler) Transfer(ctx *gofr.Context) (any, error) {
 		return nil, &apperrors.BadRequest{Message: "Invalid JSON body"}
 	}
 
-	if err := h.validate.Struct(req); err != nil {
+	if err := handler.validate.Struct(req); err != nil {
 		if ve, ok := err.(validator.ValidationErrors); ok {
 			return nil, &apperrors.BadRequest{Message: formatValidationErrors(ve)}
 		}
@@ -168,7 +168,7 @@ func (h *AccountHandler) Transfer(ctx *gofr.Context) (any, error) {
 	}
 
 	idempotencyKey := getIdempotencyKey(ctx)
-	result, err := h.service.Transfer(idempotencyKey, "POST /accounts/{id}/transfer", uint(id), req.ToAccountID, req.Amount)
+	result, err := handler.service.Transfer(idempotencyKey, "POST /accounts/{id}/transfer", uint(id), req.ToAccountID, req.Amount)
 	if err != nil {
 		return nil, err
 	}
@@ -185,8 +185,8 @@ func getIdempotencyKey(ctx *gofr.Context) string {
 
 func formatValidationErrors(errs validator.ValidationErrors) string {
 	messages := make([]string, len(errs))
-	for i, e := range errs {
-		messages[i] = e.Field() + " " + e.Tag()
+	for idx, validationErr := range errs {
+		messages[idx] = validationErr.Field() + " " + validationErr.Tag()
 	}
 	data, err := json.Marshal(messages)
 	if err != nil {
