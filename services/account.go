@@ -50,14 +50,19 @@ func (s *AccountService) Deposit(idempotencyKey string, fingerprint string, id u
 			return err
 		}
 
-		if err := tx.First(&account, id).Error; err != nil {
+		result := tx.Model(&entities.Account{}).
+			Where("id = ?", id).
+			Update("balance", gorm.Expr("balance + ?", amount))
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
 			return &apperrors.AccountNotFound{Message: "Account not found"}
 		}
 
-		if err := tx.Model(&account).Update("balance", gorm.Expr("balance + ?", amount)).Error; err != nil {
+		if err := tx.First(&account, id).Error; err != nil {
 			return err
 		}
-		account.Balance += amount
 
 		return s.idempotency.Save(tx, idempotencyKey, fingerprint, 200, &account)
 	})
@@ -79,6 +84,7 @@ func (s *AccountService) Transfer(idempotencyKey string, fingerprint string, fro
 			return err
 		}
 
+		// Verify both accounts exist and check currencies
 		if err := tx.First(&result.From, fromID).Error; err != nil {
 			return &apperrors.AccountNotFound{Message: "Source account not found"}
 		}
@@ -90,19 +96,31 @@ func (s *AccountService) Transfer(idempotencyKey string, fingerprint string, fro
 			return &apperrors.BadRequest{Message: "Cannot transfer between accounts with different currencies"}
 		}
 
-		if result.From.Balance < amount {
+		// Atomic debit: balance check + update in a single statement, no row lock needed
+		debit := tx.Model(&entities.Account{}).
+			Where("id = ? AND balance >= ?", fromID, amount).
+			Update("balance", gorm.Expr("balance - ?", amount))
+		if debit.Error != nil {
+			return debit.Error
+		}
+		if debit.RowsAffected == 0 {
 			return &apperrors.InsufficientFunds{}
 		}
 
-		if err := tx.Model(&result.From).Update("balance", gorm.Expr("balance - ?", amount)).Error; err != nil {
-			return err
+		credit := tx.Model(&entities.Account{}).
+			Where("id = ?", toID).
+			Update("balance", gorm.Expr("balance + ?", amount))
+		if credit.Error != nil {
+			return credit.Error
 		}
-		result.From.Balance -= amount
 
-		if err := tx.Model(&result.To).Update("balance", gorm.Expr("balance + ?", amount)).Error; err != nil {
+		// Re-read final balances
+		if err := tx.First(&result.From, fromID).Error; err != nil {
 			return err
 		}
-		result.To.Balance += amount
+		if err := tx.First(&result.To, toID).Error; err != nil {
+			return err
+		}
 
 		return s.idempotency.Save(tx, idempotencyKey, fingerprint, 200, &result)
 	})
